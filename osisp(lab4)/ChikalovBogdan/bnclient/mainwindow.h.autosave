@@ -1,0 +1,50 @@
+#ifndef MAINWINDOW_H
+#define MAINWINDOW_H
+
+#include <QMainWindow>
+#include <QTcpSocket>
+#include <QMessageBox>
+#include <QDebug>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
+
+QT_BEGIN_NAMESPACE
+namespace Ui { class MainWindow; }
+QT_END_NAMESPACE
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+
+public:
+    MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+
+    QTcpSocket* socket;
+    QByteArray data;
+
+    QJsonDocument document;
+    QJsonParseError parseError;
+
+public slots:
+    void socketReady();
+    void socketDisconnection();
+
+private slots:
+    void on_connectToServer_clicked();
+    void on_download_clicked();   
+    void on_disconnect_clicked();
+    
+private:
+    Ui::MainWindow *ui;
+    void createLib();
+
+    bool _complexData;
+
+    int _requireSize;
+    QString _libName;
+
+    QByteArray _lib;
+};
+#endif // MAINWINDOW_H

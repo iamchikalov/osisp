@@ -1,0 +1,109 @@
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+
+#include <QFile>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow)
+{
+    ui->setupUi(this);
+
+    socket = nullptr;
+    _complexData = false;
+}
+
+MainWindow::~MainWindow()
+{
+    delete ui;
+}
+
+void MainWindow::socketDisconnection(){
+    socket->deleteLater();
+}
+
+void MainWindow::socketReady() {
+    if (socket->waitForConnected(500)) {
+        socket->waitForReadyRead(500);
+
+        if (!_complexData){
+            data = socket->readAll();
+        }
+        else {
+            _lib.append(socket->readAll());
+            qDebug() << "Downloaded Size = " << _lib.size() << " Need size = " << _requireSize;
+
+            if (_lib.size() == _requireSize) {
+                qDebug() << "Dll is download to client";
+
+                createLib();
+
+                qDebug() << "Dll is created in File System";
+
+                _complexData = false;
+            }
+        }
+
+        document = QJsonDocument::fromJson(data, &parseError);
+
+        if (parseError.errorString().toInt() == QJsonParseError::NoError) {
+            if (document.object().value("type").toString() == "connect" && document.object().value("status").toString() == "yes") {
+                QMessageBox::information(this, "Info", "Connection with server is set");
+            }
+            else if (document.object().value("type").toString() == "info" && document.object().value("resp").toString() == "dll") {
+
+                _requireSize = document.object().value("size").toInt();
+
+                _libName = document.object().value("libname").toString();
+
+                qDebug() << "Client gets the info (libname and libsize)";
+
+                _complexData = true;
+
+                socket->write("{\"type\":\"download\", \"params\":\"dll\"}");
+                socket->waitForBytesWritten(500);
+            }
+        }
+        data.clear();
+    }
+}  
+
+void MainWindow::createLib() {
+    QFile lib("F:\\Programms\\qt_creator\\Projects\\theme\\release\\" + _libName);
+
+    if (lib.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        lib.write(_lib);
+    }
+
+    lib.close();
+}
+
+void MainWindow::on_connectToServer_clicked()
+{
+    socket = new QTcpSocket(this);
+
+    connect(socket, SIGNAL(readyRead()), this, SLOT(socketReady()));
+    connect(socket, SIGNAL(disconnected()), this, SLOT(socketDisconnection()));
+
+    socket->connectToHost("127.0.0.1", 5555);
+}
+
+void MainWindow::on_download_clicked()
+{
+    if (socket != nullptr && socket->isOpen()) {
+        socket->write("{\"type\":\"recInfo\", \"resp\":\"dll\"}");
+        socket->waitForBytesWritten(500);
+    }
+    else {
+        QMessageBox::information(this, "Information", "Client is not connect to server");
+    }
+}
+
+void MainWindow::on_disconnect_clicked()
+{
+    if (socket != nullptr) {
+        delete socket;
+    }
+
+    socket = nullptr;
+}
